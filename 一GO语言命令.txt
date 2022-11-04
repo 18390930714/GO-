@@ -1,0 +1,7 @@
+go build : 编译go程序
+
+go build -o "xx.exe" : 编译成exe文件
+
+go run xx.go : 像执行脚本一样执行go文件
+
+go install : 先编译后拷贝
