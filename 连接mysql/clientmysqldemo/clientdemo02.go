@@ -119,6 +119,108 @@ func deleteRow() {
 	fmt.Printf("delete success, affected rows: %d\n", n)
 }
 
+// 预处理查询
+func prepareQuery() {
+	sqlStr := "select id, name, age from user where id > ?"
+	stmt, err := db.Prepare(sqlStr) // Prepare() 方法返回一个 stmt 结构体对象
+	if err != nil {
+		fmt.Printf("prepare failed, err:%v\n", err)
+		return
+	}
+	defer stmt.Close()
+	rows, err := stmt.Query(0) // Query方法返回rows 对象
+	if err != nil {
+		fmt.Printf("query failed, err: %v \n", err)
+		return
+	}
+	defer rows.Close()
+	for rows.Next() {
+		var u employee
+		err := rows.Scan(&u.id, &u.name, &u.occupation, &u.age)
+		if err != nil {
+			fmt.Printf("scan failed, err:%v\n", err)
+			return
+		}
+		fmt.Printf("id:%d name:%s age:%d\n", u.id, u.name, u.occupation, u.age)
+	}
+}
+
+// 预处理插入、更新和删除操作的预处理十分类似，这里以插入操作的预处理为例：
+func prepareInsert() {
+	sqlStr := "insert into employee_table(name, occupation, age) values (?, ?, ?)"
+	stmt, err := db.Prepare(sqlStr)
+	if err != nil {
+		fmt.Printf("sql prepare failed err : %v \n", err)
+		return
+	}
+	defer stmt.Close()
+	_, err = stmt.Exec("曹阿蛮", "丞相", "57")
+	if err != nil {
+		fmt.Printf(" insert failed, err: %v \n", err)
+		return
+	}
+	_, err = stmt.Exec("王阳明", "GO开发工程师", "45")
+	if err != nil {
+		fmt.Printf("insert failed, err : %v \n", err)
+		return
+	}
+	fmt.Println("insert success.")
+}
+
+//sql 注入问题
+//我们任何时候都不应该自己拼接SQL语句！
+
+// GO实现mysql事务
+func transactionDemo() {
+	tx, err := db.Begin() //开启事务
+	if err != nil {
+		if tx != nil {
+			tx.Rollback() //回滚
+		}
+		fmt.Printf("begin trans failed, err: %v\n", err)
+		return
+	}
+
+	sqlStr1 := "Update employee_table set age=30 where id =?"
+	ret1, err := tx.Exec(sqlStr1, 2)
+	if err != nil {
+		tx.Rollback() //回滚
+		fmt.Printf("exec sql1 failed, err: %v\n", err)
+		return
+	}
+	affRow1, err := ret1.RowsAffected()
+	if err != nil {
+		tx.Rollback() // 回滚
+		fmt.Printf("exec ret1.RowsAffected() failed, err : %v\n", err)
+		return
+	}
+
+	sqlStr2 := "Update employee_table set age=40 where id=?"
+	ret2, err := tx.Exec(sqlStr2, 3)
+	if err != nil {
+		tx.Rollback() //回滚
+		fmt.Printf("exec sql2 failed, err: %v\n", err)
+		return
+	}
+	affRow2, err := ret2.RowsAffected()
+	if err != nil {
+		tx.Rollback() // 回滚
+		fmt.Printf("exec ret1.RowsAffected() failed, err: %v\n", err)
+		return
+	}
+
+	fmt.Println(affRow1, affRow2)
+	if affRow1 == 1 && affRow2 == 1 {
+		fmt.Println("事务提交。。。")
+		tx.Commit() // 提交事务
+	} else {
+		tx.Rollback()
+		fmt.Println("事务回滚了")
+	}
+
+	fmt.Println("exec trans success")
+}
+
 func main() {
 	err := initDB()
 	if err != nil {
